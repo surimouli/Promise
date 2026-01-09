@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 export default function Home() {
   return (
-    <div style={{ maxWidth: 760, margin: "40px auto", padding: 16, fontFamily: "system-ui" }}>
+    <div style={{ maxWidth: 860, margin: "40px auto", padding: 16, fontFamily: "system-ui" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ margin: 0 }}>PROMISE</h1>
         <SignedOut>
@@ -23,46 +23,125 @@ export default function Home() {
         </SignedOut>
 
         <SignedIn>
-          <MePanel />
+          <PromiseApp />
         </SignedIn>
       </main>
     </div>
   );
 }
 
-function MePanel() {
-  const [status, setStatus] = useState("loading");
-  const [user, setUser] = useState(null);
-  const [error, setError] = useState("");
+function PromiseApp() {
+  const [loading, setLoading] = useState(true);
+  const [active, setActive] = useState(null);
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+
+  async function refresh() {
+    setLoading(true);
+    const r = await fetch("/api/promise");
+    const j = await r.json();
+    setActive(j.active ?? null);
+    setLoading(false);
+  }
 
   useEffect(() => {
-    async function run() {
-      try {
-        const r = await fetch("/api/me");
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Failed to load user");
-        setUser(j.user);
-        setStatus("ready");
-      } catch (e) {
-        setError(e.message || "Unknown error");
-        setStatus("error");
-      }
-    }
-    run();
+    refresh();
   }, []);
 
-  if (status === "loading") return <p>Connecting your account…</p>;
-  if (status === "error") return <p style={{ color: "crimson" }}>Error: {error}</p>;
+  async function createPromise(e) {
+    e.preventDefault();
+    const r = await fetch("/api/promise", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, description }),
+    });
+
+    const j = await r.json();
+    if (!r.ok) {
+      const msg = j?.error?.formErrors?.[0] || "Could not create promise";
+      alert(msg);
+      return;
+    }
+
+    setTitle("");
+    setDescription("");
+    await refresh();
+  }
+
+  if (loading) return <p>Loading…</p>;
+
+  if (!active) {
+    return (
+      <div style={{ marginTop: 18 }}>
+        <h2 style={{ marginBottom: 10 }}>Create your first Promise</h2>
+
+        <form onSubmit={createPromise} style={{ display: "grid", gap: 12 }}>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Promise title (e.g., Finish my SOP draft)"
+            style={{
+              padding: 12,
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              fontSize: 16,
+            }}
+          />
+
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Optional: a little context (kept private)"
+            rows={4}
+            style={{
+              padding: 12,
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              fontSize: 16,
+              resize: "vertical",
+            }}
+          />
+
+          <button
+            style={{
+              padding: 12,
+              borderRadius: 12,
+              border: "1px solid #111",
+              background: "#111",
+              color: "#fff",
+              fontSize: 16,
+              cursor: "pointer",
+            }}
+          >
+            Create Promise
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ marginTop: 12, padding: 14, border: "1px solid #eee", borderRadius: 14 }}>
-      <p style={{ margin: 0, fontSize: 18 }}>Connected ✅</p>
-      <p style={{ marginTop: 8, color: "#444" }}>
-        Your internal user id: <code>{user.id}</code>
-      </p>
-      <p style={{ marginTop: 8, color: "#444" }}>
-        Next step: create your first Promise and start chatting.
-      </p>
+    <div style={{ marginTop: 18, display: "grid", gap: 14 }}>
+      <div style={{ padding: 16, border: "1px solid #eee", borderRadius: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+          <div>
+            <h2 style={{ margin: 0 }}>{active.title}</h2>
+            {active.description ? (
+              <p style={{ marginTop: 8, color: "#444", whiteSpace: "pre-wrap" }}>{active.description}</p>
+            ) : (
+              <p style={{ marginTop: 8, color: "#777" }}>No description.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: 16, border: "1px solid #eee", borderRadius: 16 }}>
+        <h3 style={{ marginTop: 0 }}>Next step</h3>
+        <p style={{ marginBottom: 0, color: "#444" }}>
+          Now we’ll add chat so you can talk to PROMISE and store messages securely.
+        </p>
+      </div>
     </div>
   );
 }
